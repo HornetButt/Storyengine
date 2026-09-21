@@ -9,6 +9,7 @@ import { checkStoryConsistency } from './src/server/consistency';
 import { extractKnowledgeFromText } from './src/server/extractor';
 import { getKnowledgeGraph } from './src/server/graph';
 import { discussStoryPlan, generateAutoOutline } from './src/server/planner';
+import { breakdownSceneToBeats, generateBeatProse, continueBeatProse } from './src/server/beatsGenerator';
 import { testLLMConnection, fetchAvailableModels, DEFAULT_PROVIDER_CONFIGS } from './src/server/llm';
 
 async function startServer() {
@@ -426,6 +427,7 @@ async function startServer() {
 
     const newStory = storage.createStory({
       universeId: plan.universeId,
+      planId: plan.id,
       title: plan.title || 'Новая история из плана',
       synopsis:
         plan.premise ||
@@ -439,6 +441,7 @@ async function startServer() {
       storyYear: plan.storyYear,
       characterIds: plan.selectedCharacterIds,
       locationIds: plan.selectedLocationIds,
+      scenes: plan.scenes,
     });
 
     storage.updateStoryPlan(plan.id, { status: 'ready_to_write' });
@@ -463,6 +466,37 @@ async function startServer() {
     } catch (e: any) {
       console.error('Planner outline generation error:', e);
       res.status(500).json({ error: e.message || 'Ошибка генерации тезисного плана' });
+    }
+  });
+
+  // Story Beats Engine (Пошаговое написание сцен и битов)
+  api.post('/beats/breakdown', async (req, res) => {
+    try {
+      const beats = await breakdownSceneToBeats(req.body);
+      res.json({ beats });
+    } catch (e: any) {
+      console.error('Beats breakdown error:', e);
+      res.status(500).json({ error: e.message || 'Ошибка разбивки сцены на биты' });
+    }
+  });
+
+  api.post('/beats/generate-prose', async (req, res) => {
+    try {
+      const result = await generateBeatProse(req.body);
+      res.json(result);
+    } catch (e: any) {
+      console.error('Beat prose generation error:', e);
+      res.status(500).json({ error: e.message || 'Ошибка генерации прозы бита' });
+    }
+  });
+
+  api.post('/beats/continue', async (req, res) => {
+    try {
+      const result = await continueBeatProse(req.body);
+      res.json(result);
+    } catch (e: any) {
+      console.error('Beat continue prose error:', e);
+      res.status(500).json({ error: e.message || 'Ошибка продолжения текста' });
     }
   });
 

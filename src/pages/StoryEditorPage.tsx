@@ -25,6 +25,7 @@ interface StoryEditorPageProps {
   universes: Universe[];
   onBack: () => void;
   onOpenCanvas?: (storyId: string) => void;
+  onOpenBeatsStudio?: (storyId: string) => void;
   onStoryUpdated: () => void;
 }
 
@@ -33,6 +34,7 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
   universes,
   onBack,
   onOpenCanvas,
+  onOpenBeatsStudio,
   onStoryUpdated,
 }) => {
   const [story, setStory] = useState<Story | null>(null);
@@ -232,6 +234,17 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
             <Tv className="w-3.5 h-3.5 text-amber-400" />
             <span>Телесуфлер</span>
           </button>
+
+          {onOpenBeatsStudio && (
+            <button
+              onClick={() => onOpenBeatsStudio(storyId)}
+              className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-medium border border-amber-500/30 flex items-center space-x-1.5 transition-colors"
+              title="Открыть в студии пошагового написания по сценам и битам"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Биты (Beats Studio)</span>
+            </button>
+          )}
 
           {onOpenCanvas && (
             <button

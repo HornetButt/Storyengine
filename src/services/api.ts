@@ -12,6 +12,9 @@ import {
   StoryPlan,
   PlannedScene,
   PlannerChatMessage,
+  StoryBeat,
+  BreakdownSceneRequest,
+  GenerateBeatProseRequest,
   LLMConfig,
   LLMTestResult,
 } from '../types';
@@ -353,6 +356,37 @@ export const api = {
       body: JSON.stringify(plan),
     });
     return handleResponse<PlannedScene[]>(res);
+  },
+
+  // Story Beats Engine (Пошаговое написание по битам)
+  async breakdownScene(req: BreakdownSceneRequest): Promise<{ beats: StoryBeat[] }> {
+    const res = await fetch(`${API_BASE}/beats/breakdown`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ beats: StoryBeat[] }>(res);
+  },
+  async generateBeatProse(req: GenerateBeatProseRequest): Promise<{ text: string; wordCount: number }> {
+    const res = await fetch(`${API_BASE}/beats/generate-prose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ text: string; wordCount: number }>(res);
+  },
+  async continueBeatProse(payload: {
+    universeId: string;
+    storyYear: number;
+    currentText: string;
+    instruction?: string;
+  }): Promise<{ addedText: string }> {
+    const res = await fetch(`${API_BASE}/beats/continue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<{ addedText: string }>(res);
   },
 
   // LLM Provider Configuration

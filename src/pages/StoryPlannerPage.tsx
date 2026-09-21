@@ -44,6 +44,7 @@ interface StoryPlannerPageProps {
   selectedUniverseId: string;
   onSelectStory: (id: string) => void;
   onRefreshAll: () => void;
+  onOpenBeatsStudio?: (storyId: string) => void;
 }
 
 export const StoryPlannerPage: React.FC<StoryPlannerPageProps> = ({
@@ -55,6 +56,7 @@ export const StoryPlannerPage: React.FC<StoryPlannerPageProps> = ({
   selectedUniverseId,
   onSelectStory,
   onRefreshAll,
+  onOpenBeatsStudio,
 }) => {
   const [universeId, setUniverseId] = useState<string>(
     selectedUniverseId || universes[0]?.id || 'uni-main'
@@ -217,6 +219,22 @@ export const StoryPlannerPage: React.FC<StoryPlannerPageProps> = ({
       onSelectStory(newStory.id);
     } catch (e: any) {
       alert('Ошибка преобразования плана в рассказ: ' + e.message);
+    }
+  };
+
+  const handleOpenBeatsStudio = async (specificSceneId?: string) => {
+    if (!currentPlan) return;
+    try {
+      await handleSavePlan();
+      const newStory = await api.convertPlanToStory(currentPlan.id);
+      onRefreshAll();
+      if (onOpenBeatsStudio) {
+        onOpenBeatsStudio(newStory.id);
+      } else {
+        onSelectStory(newStory.id);
+      }
+    } catch (e: any) {
+      alert('Ошибка открытия студии битов: ' + e.message);
     }
   };
 
@@ -560,11 +578,21 @@ export const StoryPlannerPage: React.FC<StoryPlannerPageProps> = ({
           <button
             id="btn-convert-plan-to-story"
             onClick={handleConvertToStory}
-            className="flex items-center space-x-2 px-4 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow-sm transition-all hover:shadow-amber-500/20"
+            className="flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg border border-stone-700 transition-colors"
             title="Сформировать черновик истории со структурой сцен и перейти в редактор"
           >
-            <BookOpen className="w-4 h-4" />
-            <span>Превратить в рассказ</span>
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+            <span>Черновик</span>
+          </button>
+
+          <button
+            id="btn-write-beats-studio"
+            onClick={() => handleOpenBeatsStudio()}
+            className="flex items-center space-x-2 px-4 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg shadow-sm transition-all hover:shadow-amber-500/20"
+            title="Писать пошагово по сценам и битам (Story Beats Studio)"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Студия битов (Story Beats)</span>
             <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
           </button>
 
@@ -1070,6 +1098,21 @@ export const StoryPlannerPage: React.FC<StoryPlannerPageProps> = ({
                                 className="w-full bg-transparent text-xs text-stone-200 focus:outline-none"
                               />
                             </div>
+                          </div>
+
+                          {/* Write scene with Story Beats Studio */}
+                          <div className="pt-2 border-t border-stone-800/80 flex items-center justify-between">
+                            <span className="text-[11px] text-stone-500 font-mono">
+                              {scene.beats?.length ? `${scene.beats.length} битов готово` : 'Сцена для пошаговой студии'}
+                            </span>
+                            <button
+                              onClick={() => handleOpenBeatsStudio(scene.id)}
+                              className="flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors font-medium"
+                              title="Перейти к пошаговой генерации прозы для этой сцены"
+                            >
+                              <Sparkles className="w-3 h-3 text-amber-400" />
+                              <span>Писать сцену по битам →</span>
+                            </button>
                           </div>
                         </div>
                       ))}

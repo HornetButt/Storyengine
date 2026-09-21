@@ -32,6 +32,7 @@ interface GenerationPageProps {
   selectedUniverseId: string;
   onSelectStory: (id: string) => void;
   onRefreshAll: () => void;
+  onOpenBeatsStudio?: (storyId?: string) => void;
 }
 
 export const GenerationPage: React.FC<GenerationPageProps> = ({
@@ -41,6 +42,7 @@ export const GenerationPage: React.FC<GenerationPageProps> = ({
   selectedUniverseId,
   onSelectStory,
   onRefreshAll,
+  onOpenBeatsStudio,
 }) => {
   const [universeId, setUniverseId] = useState(selectedUniverseId || universes[0]?.id || '');
   const [storyYear, setStoryYear] = useState(2026);
@@ -319,6 +321,17 @@ export const GenerationPage: React.FC<GenerationPageProps> = ({
               <span>{isGenerating ? 'Генерация...' : 'Сгенерировать'}</span>
             </button>
           </div>
+
+          {onOpenBeatsStudio && (
+            <button
+              type="button"
+              onClick={() => onOpenBeatsStudio()}
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/15 via-amber-500/25 to-amber-600/15 hover:from-amber-500/25 hover:to-amber-600/25 text-amber-300 font-semibold transition-all flex items-center justify-center space-x-2 border border-amber-500/40 text-xs shadow-sm"
+            >
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>Пошаговое написание по сценам и битам (Story Beats Studio) →</span>
+            </button>
+          )}
         </div>
 
         {/* Right Output: 7 cols */}

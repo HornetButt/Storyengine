@@ -16,12 +16,15 @@ import {
   Tv,
   FileEdit,
   Compass,
+  Layers,
 } from 'lucide-react';
 
 export type NavItem =
   | 'dashboard'
-  | 'canvas'
   | 'planner'
+  | 'beats'
+  | 'canvas'
+  | 'generation'
   | 'stories'
   | 'teleprompter'
   | 'characters'
@@ -32,7 +35,6 @@ export type NavItem =
   | 'timeline'
   | 'graph'
   | 'search'
-  | 'generation'
   | 'settings';
 
 interface SidebarProps {
@@ -45,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, pendi
   const navItems: { id: NavItem; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
     { id: 'dashboard', label: 'Обзор (Dashboard)', icon: LayoutDashboard },
     { id: 'planner', label: 'Планировщик сюжета', icon: Compass },
+    { id: 'beats', label: 'Студия битов (Beats)', icon: Layers },
     { id: 'canvas', label: 'Холст истории (Word)', icon: FileEdit },
     { id: 'generation', label: 'Генератор историй', icon: Sparkles },
     { id: 'stories', label: 'Истории (Stories)', icon: BookOpen },

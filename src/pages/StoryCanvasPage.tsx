@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Plus,
   Layers,
+  Sparkles,
   ArrowLeft,
   ChevronDown,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ interface StoryCanvasPageProps {
   onSelectStory: (id: string) => void;
   onRefreshAll: () => Promise<void>;
   onBackToStories?: () => void;
+  onOpenBeatsStudio?: (storyId: string) => void;
 }
 
 export const StoryCanvasPage: React.FC<StoryCanvasPageProps> = ({
@@ -51,6 +53,7 @@ export const StoryCanvasPage: React.FC<StoryCanvasPageProps> = ({
   onSelectStory,
   onRefreshAll,
   onBackToStories,
+  onOpenBeatsStudio,
 }) => {
   // Current Story state
   const [selectedStoryId, setSelectedStoryId] = useState<string>(initialStoryId || stories[0]?.id || '');
@@ -416,6 +419,18 @@ export const StoryCanvasPage: React.FC<StoryCanvasPageProps> = ({
             <Plus className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden sm:inline">Новый лист</span>
           </button>
+
+          {onOpenBeatsStudio && (
+            <button
+              type="button"
+              onClick={() => onOpenBeatsStudio(selectedStoryId)}
+              className="flex items-center space-x-1.5 px-3 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-medium transition-colors"
+              title="Открыть студию пошагового написания сцен и битов"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden md:inline">Студия битов (Beats)</span>
+            </button>
+          )}
         </div>
 
         {/* Story Title & Save notification */}

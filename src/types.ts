@@ -141,6 +141,7 @@ export interface StoryVersion {
 export interface Story {
   id: string;
   universeId: string;
+  planId?: string;
   title: string;
   synopsis: string;
   fullText: string;
@@ -153,6 +154,8 @@ export interface Story {
   characterIds?: string[];
   locationIds?: string[];
   eventIds?: string[];
+  scenes?: PlannedScene[];
+  activeBeatId?: string;
   versions?: StoryVersion[];
   createdAt: string;
   updatedAt: string;
@@ -223,7 +226,20 @@ export interface GenerateStoryRequest {
   forbiddenElements?: string[];
 }
 
-// Story Planning & Discussion
+// Story Planning & Story Beats
+export interface StoryBeat {
+  id: string;
+  sceneId: string;
+  beatIndex: number;
+  title: string;
+  directive: string;
+  charactersPresent?: string[];
+  status: 'pending' | 'generated' | 'approved';
+  generatedText?: string;
+  userNotes?: string;
+  targetWordCount?: number;
+}
+
 export interface PlannedScene {
   id: string;
   title: string;
@@ -236,6 +252,29 @@ export interface PlannedScene {
   plotTwist?: string;
   emotionalBeat?: string;
   keyClueOrObject?: string;
+  beats?: StoryBeat[];
+  sceneText?: string;
+  status?: 'planned' | 'in_progress' | 'completed';
+}
+
+export interface BreakdownSceneRequest {
+  universeId: string;
+  storyYear: number;
+  scene: PlannedScene;
+  genre?: string;
+  tone?: string;
+  premise?: string;
+}
+
+export interface GenerateBeatProseRequest {
+  universeId: string;
+  storyYear: number;
+  beat: StoryBeat;
+  scene: PlannedScene;
+  previousText?: string;
+  genre?: string;
+  tone?: string;
+  styleNotes?: string;
 }
 
 export interface StoryPlan {

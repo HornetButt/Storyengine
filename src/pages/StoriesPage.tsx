@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Story, Universe } from '../types';
 import { ConsistencyBadge } from '../components/ConsistencyBadge';
-import { Plus, Upload, Search, Filter, BookOpen, Calendar, Layers, Tv, FileEdit } from 'lucide-react';
+import { Plus, Upload, Search, Filter, BookOpen, Calendar, Layers, Tv, FileEdit, Sparkles } from 'lucide-react';
 
 interface StoriesPageProps {
   stories: Story[];
@@ -12,6 +12,7 @@ interface StoriesPageProps {
   onOpenImport: () => void;
   onOpenCanvas?: (storyId?: string) => void;
   onOpenTeleprompter?: (storyId?: string) => void;
+  onOpenBeatsStudio?: (storyId: string) => void;
 }
 
 export const StoriesPage: React.FC<StoriesPageProps> = ({
@@ -23,6 +24,7 @@ export const StoriesPage: React.FC<StoriesPageProps> = ({
   onOpenImport,
   onOpenCanvas,
   onOpenTeleprompter,
+  onOpenBeatsStudio,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [canonFilter, setCanonFilter] = useState('all');
@@ -186,6 +188,20 @@ export const StoriesPage: React.FC<StoriesPageProps> = ({
                     v{story.versions?.length || 1} версий
                   </span>
                   <div className="flex items-center space-x-2">
+                    {onOpenBeatsStudio && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenBeatsStudio(story.id);
+                        }}
+                        className="p-1 rounded-md text-stone-400 hover:text-amber-300 hover:bg-stone-800 transition-colors flex items-center gap-1 px-1.5"
+                        title="Открыть в студии пошагового написания по сценам и битам"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="hidden sm:inline text-[10px]">Биты</span>
+                      </button>
+                    )}
                     {onOpenCanvas && (
                       <button
                         type="button"

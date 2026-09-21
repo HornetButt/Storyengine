@@ -3,6 +3,7 @@ import { Sidebar, NavItem } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ImportStoryModal } from './components/ImportStoryModal';
 import { Teleprompter } from './components/Teleprompter';
+import { StoryBeatsStudio } from './components/StoryBeats/StoryBeatsStudio';
 import { StoryPlannerPage } from './pages/StoryPlannerPage';
 import { StoryCanvasPage } from './pages/StoryCanvasPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -182,7 +183,29 @@ export default function App() {
                 setActiveStoryId(null);
                 setCurrentTab('canvas');
               }}
+              onOpenBeatsStudio={(id) => {
+                setCanvasStoryId(id);
+                setActiveStoryId(null);
+                setCurrentTab('beats');
+              }}
               onStoryUpdated={loadAllData}
+            />
+          ) : currentTab === 'beats' ? (
+            <StoryBeatsStudio
+              universes={universes}
+              characters={characters}
+              locations={locations}
+              stories={stories}
+              initialStoryId={canvasStoryId || activeStoryId || stories[0]?.id || null}
+              onSelectStory={(id) => {
+                setCanvasStoryId(id);
+              }}
+              onRefreshAll={loadAllData}
+              onOpenCanvas={(id) => {
+                setCanvasStoryId(id);
+                setActiveStoryId(null);
+                setCurrentTab('canvas');
+              }}
             />
           ) : currentTab === 'canvas' ? (
             <StoryCanvasPage
@@ -200,6 +223,11 @@ export default function App() {
               onBackToStories={() => {
                 setCurrentTab('stories');
                 setActiveStoryId(null);
+              }}
+              onOpenBeatsStudio={(id) => {
+                setCanvasStoryId(id);
+                setActiveStoryId(null);
+                setCurrentTab('beats');
               }}
             />
           ) : currentTab === 'dashboard' ? (
@@ -224,6 +252,11 @@ export default function App() {
               selectedUniverseId={selectedUniverseId}
               onSelectStory={handleSelectStory}
               onRefreshAll={loadAllData}
+              onOpenBeatsStudio={(id) => {
+                setCanvasStoryId(id);
+                setActiveStoryId(null);
+                setCurrentTab('beats');
+              }}
             />
           ) : currentTab === 'stories' ? (
             <StoriesPage
@@ -237,6 +270,11 @@ export default function App() {
                 setCanvasStoryId(id || null);
                 setActiveStoryId(null);
                 setCurrentTab('canvas');
+              }}
+              onOpenBeatsStudio={(id) => {
+                setCanvasStoryId(id || null);
+                setActiveStoryId(null);
+                setCurrentTab('beats');
               }}
               onOpenTeleprompter={(id) => {
                 setTeleprompterStoryId(id || null);
@@ -267,6 +305,11 @@ export default function App() {
               selectedUniverseId={selectedUniverseId}
               onSelectStory={handleSelectStory}
               onRefreshAll={loadAllData}
+              onOpenBeatsStudio={(id) => {
+                if (id) setCanvasStoryId(id);
+                setActiveStoryId(null);
+                setCurrentTab('beats');
+              }}
             />
           ) : currentTab === 'timeline' ? (
             <TimelinePage
