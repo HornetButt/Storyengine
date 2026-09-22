@@ -2,6 +2,7 @@ import { LLMProvider, LLMTaskType, LLMTaskMap } from './types';
 import { callLLM, safeParseJson } from '../server/llm';
 import { ContextBuilder } from './contextBuilder';
 import { MockLLMProvider } from './mockProvider';
+import { validateAndNormalizeBeats } from './beatPlannerUtils';
 import {
   StoryConcept,
   Plot,
@@ -246,53 +247,107 @@ ${ContextBuilder.formatForPrompt(ctx)}
       scene: input.scene,
     });
 
+    const activeChars = (input.scene.characters && input.scene.characters.length > 0)
+      ? input.scene.characters
+      : input.bible.characters.map((c) => c.name);
+
     const prompt = `Ты — Story Engine Beat Planner.
-Разбей сцену «${input.scene.title}» на драматические биты (3-5 битов).
-Каждый бит — это микрошаг: действие, обмен информацией и сдвиг эмоционального заряда.
+Твоя задача — разбить сцену «${input.scene.title}» на последовательную драматическую цепочку битов.
+
+=== ПРИНЦИП ПОСТРОЕНИЯ БИТОВ ===
+Beat — это НЕ маленькая сцена и НЕ отрывок художественного текста.
+Beat — это минимальный неделимый драматический шаг, после которого ситуация в сцене становится немного другой:
+[Состояние 0] → Бит 1 → [Состояние 1] → Бит 2 → [Состояние 2] → Бит 3 → [Состояние 3]...
+
+Каждый последующий бит должен быть логическим следствием предыдущего:
+- Бит 1 создает начальный импульс или микрособытие.
+- Бит 2 реагирует на результат Бита 1 или преодолевает возникшее препятствие.
+- Бит 3 развивает конфликт, раскрывает новую информацию или меняет эмоциональный вектор.
+- Последующие биты подводят сцену к завершению ее сюжетной цели.
+
+=== ВОПРОСЫ, НА КОТОРЫЕ ОТВЕЧАЕТ КАЖДЫЙ БИТ ===
+1. Что происходит и кто действует? (action, characters)
+2. Чего персонаж хочет непосредственно в этом бите и что ему мешает? (purpose)
+3. Какая драматическая информация раскрывается зрителю или сцене? (information)
+4. Как меняется эмоциональное состояние действующего лица? (emotionalChange)
+5. Что меняется в состоянии истории и персонажей? (stateChanges: newKnowledge, newEmotion, flag)
+6. Почему после этого бита становится возможен следующий бит? (причинно-следственная связь)
+
+=== ТРЕБОВАНИЯ К КОЛИЧЕСТВУ И ОБЪЕМУ ===
+- Количество битов определяется сложностью сцены:
+  * Короткая простая сцена: 3-4 бита
+  * Стандартная сцена: 4-6 битов
+  * Сложная насыщенная сцена: 5-8 битов
+- Объем (targetWordCount) должен соответствовать драматическому весу бита:
+  * Короткий переход или микрореакция: 100-150 слов
+  * Стандартный содержательный бит: 150-300 слов
+  * Ключевое столкновение или кульминация сцены: 300-450 слов
+
+=== СТРУКТУРА STATE CHANGES ===
+В поле "stateChanges" укажи предполагаемые микроизменения состояния (если они есть):
+"stateChanges": [
+  {
+    "character": "Имя персонажа",
+    "newKnowledge": "Что именно осознал или узнал конкретный персонаж",
+    "newEmotion": "Новое эмоциональное состояние персонажа",
+    "flag": "machine_readable_event_flag"
+  }
+]
+- Поле "information" описывает общую драматическую информацию бита для читателя/сцены.
+- Поле "newKnowledge" описывает личное знание конкретного персонажа. Не дублируй их слепо.
+- Если в бите нет сдвига состояния, передай пустой массив: "stateChanges": []. Не выдумывай искусственные флаги там, где их нет.
+- "stateChanges" — это рабочее предложение для сцены, оно НЕ меняет глобальный Канон автоматически.
+
+=== СТРОГИЕ ЗАПРЕТЫ ===
+1. ЗАПРЕЩЕНО писать художественный текст, диалоги репликами или прозу — нужен только драматургический план.
+2. ЗАПРЕЩЕНО придумывать самостоятельные сцены вместо минимальных шагов (битов).
+3. ЗАПРЕЩЕНО перескакивать через причинно-следственные связи: Бит 2 обязан развивать ситуацию после Бита 1.
+4. ЗАПРЕЩЕНО вводить новых персонажей! Используй ТОЛЬКО доступных персонажей сцены: ${activeChars.join(', ')}.
+5. ЗАПРЕЩЕНО нарушать канонические правила и установленные факты библии.
+6. ЗАПРЕЩЕНО раскрывать центральные тайны без сюжетного обоснования.
+7. ЗАПРЕЩЕНО создавать дублирующие биты, описывающие одно и то же действие.
+8. ЗАПРЕЩЕНО использовать абстрактные клише («происходит нечто важное», «герой думает о жизни»).
+9. Каждый бит должен быть предельно конкретным и исполнимым для последующего написания.
 
 ${ContextBuilder.formatForPrompt(ctx)}
 
-Сцена:
-Цель: ${input.scene.purpose}
-Конфликт: ${input.scene.conflict}
-Эмоциональный сдвиг: ${input.scene.emotionalChange}
-
-Ответь строго валидным JSON:
+Ответь СТРОГО валидным JSON без постороннего текста:
 {
   "beats": [
     {
       "beatIndex": 1,
       "title": "Краткое название бита",
-      "purpose": "Драматургическая цель",
-      "action": "Физическое или речевое действие героя",
-      "characters": ["Персонажи в кадре"],
-      "information": "Какую крупицу информации передать",
-      "emotionalChange": "Сдвиг состояния",
-      "targetWordCount": 250
+      "purpose": "Драматургическая цель (чего хочет герой и что мешает)",
+      "action": "Конкретное физическое или речевое действие персонажа",
+      "characters": ["${activeChars[0] || 'Имя персонажа'}"],
+      "information": "Какая новая информация проявляется в этом шаге",
+      "emotionalChange": "Сдвиг эмоции (например, От спокойствия к настороженности)",
+      "stateChanges": [
+        {
+          "character": "${activeChars[0] || 'Имя персонажа'}",
+          "newKnowledge": "Осознание конкретного факта",
+          "newEmotion": "настороженность",
+          "flag": "first_clue_observed"
+        }
+      ],
+      "targetWordCount": 200
     }
   ]
 }`;
 
-    const reply = await callLLM({ prompt, temperature: 0.6 });
+    const reply = await callLLM({ prompt, temperature: 0.5 });
     if (reply) {
-      const parsed = safeParseJson<{ beats: any[] }>(reply, null as any);
-      if (parsed && parsed.beats && Array.isArray(parsed.beats)) {
-        return parsed.beats.map((b, idx) => ({
-          id: `beat-${input.scene.id}-${idx + 1}`,
-          sceneId: input.scene.id,
-          beatIndex: b.beatIndex || idx + 1,
-          title: b.title || `Бит ${idx + 1}`,
-          purpose: b.purpose || b.action,
-          action: b.action || b.purpose,
-          characters: b.characters || input.scene.characters,
-          information: b.information || '',
-          emotionalChange: b.emotionalChange || '',
-          status: 'pending',
-          targetWordCount: b.targetWordCount || 250,
-        }));
+      const parsed = safeParseJson<any>(reply, null);
+      if (parsed) {
+        const normalized = validateAndNormalizeBeats(parsed, input.scene, input.bible);
+        if (normalized.length > 0) {
+          return normalized;
+        }
       }
     }
-    return this.fallbackMock.generate('BEAT_PLANNER', input);
+
+    const fallbackBeats = await this.fallbackMock.generate('BEAT_PLANNER', input);
+    return validateAndNormalizeBeats(fallbackBeats, input.scene, input.bible);
   }
 
   private async handleWriter(input: import('./types').WriterInput): Promise<{ text: string; wordCount: number }> {
@@ -305,6 +360,12 @@ ${ContextBuilder.formatForPrompt(ctx)}
       beat: input.beat,
     });
 
+    const stateChangesStr = (input.beat.stateChanges && input.beat.stateChanges.length > 0)
+      ? `\n- Ожидаемый сдвиг состояния: ${input.beat.stateChanges
+          .map((sc) => [sc.character, sc.newKnowledge, sc.newEmotion, sc.flag ? `[flag: ${sc.flag}]` : ''].filter(Boolean).join(' | '))
+          .join('; ')}`
+      : '';
+
     const prompt = `Ты — Story Engine Master Writer.
 Напиши выразительный художественный текст для конкретного сценарного бита на русском языке.
 
@@ -314,7 +375,7 @@ ${ContextBuilder.formatForPrompt(ctx)}
 - Номер: #${input.beat.beatIndex} «${input.beat.title}»
 - Действие: ${input.beat.action}
 - Эмоциональный заряд: ${input.beat.emotionalChange}
-- Целевой объём: ~${input.beat.targetWordCount || 250} слов
+- Целевой объём: ~${input.beat.targetWordCount || 250} слов${stateChangesStr}
 ${input.styleDirectives ? `- Особые указания стиля: ${input.styleDirectives}` : ''}
 ${input.previousText ? `\nПРЕДШЕСТВУЮЩИЙ ТЕКСТ СЦЕНЫ (продолжай органично):\n"""\n${input.previousText.slice(-800)}\n"""` : ''}
 

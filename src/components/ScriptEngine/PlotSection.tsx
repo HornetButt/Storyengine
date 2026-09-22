@@ -268,7 +268,7 @@ export const PlotSection: React.FC<PlotSectionProps> = ({
                                                 : 'bg-stone-900 text-stone-400 border-stone-800'
                                             }`}
                                           >
-                                            {b.beatIndex + 1}. {b.purpose || b.title}
+                                            {b.beatIndex || 1}. {b.purpose || b.title}
                                           </span>
                                         ))}
                                       </div>

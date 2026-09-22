@@ -42,7 +42,11 @@ export interface MinimalLLMContext {
     conflict: string;
     emotionalChange: string;
     location: string;
+    time?: string;
     characters: string[];
+    requiredEvents?: string[];
+    forbiddenEvents?: string[];
+    informationRevealed?: string[];
   };
   beatContext?: {
     id: string;
@@ -161,7 +165,11 @@ export class ContextBuilder {
             conflict: scene.conflict,
             emotionalChange: scene.emotionalChange,
             location: scene.location,
+            time: scene.time,
             characters: scene.characters,
+            requiredEvents: scene.requiredEvents,
+            forbiddenEvents: scene.forbiddenEvents,
+            informationRevealed: scene.informationRevealed,
           }
         : undefined,
       beatContext: beat
@@ -215,9 +223,41 @@ export class ContextBuilder {
       }
     }
 
+    if (ctx.currentState.eventsOccurred.length) {
+      lines.push(`\nУЖЕ ПРОИЗОШЕДШИЕ СОБЫТИЯ И АКТИВНЫЕ ФЛАГИ:`);
+      for (const ev of ctx.currentState.eventsOccurred) {
+        lines.push(`* [flag: ${ev}]`);
+      }
+    }
+
+    if (ctx.currentState.unresolvedMysteries.length) {
+      lines.push(`\nНЕРАЗРЕШЕННЫЕ ТАЙНЫ:`);
+      for (const m of ctx.currentState.unresolvedMysteries) {
+        lines.push(`? ${m}`);
+      }
+    }
+
     if (ctx.currentState.previousSceneSummary) {
       lines.push(`\nИТОГ ПРЕДЫДУЩИХ СОБЫТИЙ:`);
       lines.push(`"${ctx.currentState.previousSceneSummary}"`);
+    }
+
+    if (ctx.sceneContext) {
+      lines.push(`\nТЕКУЩАЯ СЦЕНА: «${ctx.sceneContext.title}»`);
+      lines.push(`Цель сцены: ${ctx.sceneContext.purpose}`);
+      lines.push(`Конфликт: ${ctx.sceneContext.conflict}`);
+      lines.push(`Эмоциональный сдвиг: ${ctx.sceneContext.emotionalChange}`);
+      lines.push(`Персонажи сцены: ${ctx.sceneContext.characters.join(', ')}`);
+      lines.push(`Место и время: ${ctx.sceneContext.location}${ctx.sceneContext.time ? `, ${ctx.sceneContext.time}` : ''}`);
+      if (ctx.sceneContext.requiredEvents?.length) {
+        lines.push(`Обязательные микрособытия: ${ctx.sceneContext.requiredEvents.join('; ')}`);
+      }
+      if (ctx.sceneContext.forbiddenEvents?.length) {
+        lines.push(`Запрещено в сцене: ${ctx.sceneContext.forbiddenEvents.join('; ')}`);
+      }
+      if (ctx.sceneContext.informationRevealed?.length) {
+        lines.push(`Должно быть раскрыто: ${ctx.sceneContext.informationRevealed.join('; ')}`);
+      }
     }
 
     return lines.join('\n');

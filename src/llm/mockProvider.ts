@@ -133,32 +133,81 @@ export class MockLLMProvider implements LLMProvider {
 
       case 'BEAT_PLANNER': {
         const inp = input as import('./types').BeatPlannerInput;
+        const mainChar = (inp.scene.characters && inp.scene.characters.length > 0)
+          ? inp.scene.characters[0]
+          : (inp.bible.characters?.[0]?.name || 'Герой');
+        const secondChar = (inp.scene.characters && inp.scene.characters.length > 1)
+          ? inp.scene.characters[1]
+          : inp.bible.characters?.[1]?.name;
+
         const beats: Beat[] = [
           {
-            id: `beat-mock-${inp.scene.id}-1`,
+            id: `beat-${inp.scene.id}-1`,
             sceneId: inp.scene.id,
             beatIndex: 1,
-            title: 'Осмотр помещения',
-            purpose: 'Показать вход героя и восприятие пространства.',
-            action: 'Герой входит в комнату и проверяет освещение.',
-            characters: inp.scene.characters,
-            information: 'Пыль на столе потревожена.',
-            emotionalChange: 'От настороженности к внимательности.',
+            title: 'Вход в локацию и обнаружение аномалии',
+            purpose: 'Показать исходное намерение героя и первое скрытое препятствие.',
+            action: `${mainChar} входит в локацию и осматривает пространство, замечая следы недавнего присутствия.`,
+            characters: [mainChar],
+            information: 'На полу заметны свежие следы и нарушенный порядок вещей.',
+            emotionalChange: 'От сосредоточенного спокойствия к настороженному вниманию.',
+            stateChanges: [
+              {
+                character: mainChar,
+                newEmotion: 'настороженность',
+                flag: 'location_entered',
+              },
+            ],
             status: 'pending',
-            targetWordCount: 200,
+            targetWordCount: 180,
           },
           {
-            id: `beat-mock-${inp.scene.id}-2`,
+            id: `beat-${inp.scene.id}-2`,
             sceneId: inp.scene.id,
             beatIndex: 2,
-            title: 'Ключевая находка',
-            purpose: 'Раскрыть новую деталь.',
-            action: 'Герой открывает ящик стола и достает документ.',
-            characters: inp.scene.characters,
-            information: 'Документ датирован недавним числом.',
-            emotionalChange: 'Холодное осознание слежки.',
+            title: 'Исследование источника тревоги',
+            purpose: 'Развить подозрение в конкретное действие проверки замкнутого объекта.',
+            action: `${mainChar} направляется к источнику шума и проверяет поврежденный дверной замок.`,
+            characters: [mainChar],
+            information: 'Механизм замка был сломан намеренно изнутри, а не снаружи.',
+            emotionalChange: 'Нарастание внутреннего напряжения и подозрения.',
+            stateChanges: [
+              {
+                character: mainChar,
+                newKnowledge: 'Замок взломан изнутри, кто-то пытался выбраться',
+                newEmotion: 'напряжение',
+                flag: 'lock_inspected',
+              },
+            ],
             status: 'pending',
-            targetWordCount: 250,
+            targetWordCount: 220,
+          },
+          {
+            id: `beat-${inp.scene.id}-3`,
+            sceneId: inp.scene.id,
+            beatIndex: 3,
+            title: 'Внезапное столкновение и решающая улика',
+            purpose: 'Кульминация сцены — герой сталкивается с прямым свидетельством происходящего.',
+            action: secondChar
+              ? `${mainChar} слышит тихий шаг позади и резко оборачивается, встречаясь взглядом с ${secondChar}.`
+              : `${mainChar} обнаруживает спрятанный под половицей дневник и читает последнюю запись.`,
+            characters: secondChar ? [mainChar, secondChar] : [mainChar],
+            information: secondChar
+              ? `${secondChar} скрывает свое истинное присутствие в здании.`
+              : 'Последняя запись в дневнике прямо указывает на подготовленную диверсию.',
+            emotionalChange: 'От настороженного ожидания к решимости выяснить правду.',
+            stateChanges: [
+              {
+                character: mainChar,
+                newKnowledge: secondChar
+                  ? `${secondChar} тайно присутствовал в локации`
+                  : 'Обнаружено прямое доказательство диверсии',
+                newEmotion: 'решимость',
+                flag: 'clue_uncovered',
+              },
+            ],
+            status: 'pending',
+            targetWordCount: 280,
           },
         ];
         return beats as LLMTaskMap[T]['output'];

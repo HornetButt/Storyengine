@@ -314,7 +314,7 @@ export const WriterSection: React.FC<WriterSectionProps> = ({
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <span className="font-semibold text-stone-200">
-                        Бит {beat.beatIndex + 1}: {beat.purpose || beat.title}
+                        Бит {beat.beatIndex || 1}: {beat.purpose || beat.title}
                       </span>
                       <button
                         onClick={() => handleWriteBeat(beat.id)}
@@ -327,6 +327,20 @@ export const WriterSection: React.FC<WriterSectionProps> = ({
                     </div>
 
                     <p className="text-stone-400 leading-relaxed mb-1">{beat.action}</p>
+
+                    {beat.stateChanges && beat.stateChanges.length > 0 && (
+                      <div className="flex flex-wrap gap-1 my-1">
+                        {beat.stateChanges.map((sc, scIdx) => (
+                          <span
+                            key={scIdx}
+                            className="inline-flex items-center text-[9px] px-1.5 py-0.5 rounded bg-stone-950 text-amber-300/80 border border-stone-800"
+                            title={sc.newKnowledge || sc.newEmotion || sc.flag || ''}
+                          >
+                            {sc.flag ? `⚑ ${sc.flag}` : sc.newKnowledge ? `💡 ${sc.newKnowledge.slice(0, 24)}...` : sc.newEmotion ? `♥ ${sc.newEmotion}` : (sc.character || 'сдвиг')}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="text-[10px] text-stone-500 flex items-center justify-between border-t border-stone-800/60 pt-1 mt-1">
                       <span>Эмоция: {beat.emotionalChange}</span>

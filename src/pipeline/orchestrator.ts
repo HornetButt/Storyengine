@@ -9,6 +9,7 @@ import {
 } from '../domain/storyModel';
 import { LLMProvider } from '../llm/types';
 import { DefaultLLMProvider } from '../llm/defaultProvider';
+import { validateAndNormalizeBeats } from '../llm/beatPlannerUtils';
 
 export class StoryOrchestrator {
   private llm: LLMProvider;
@@ -145,13 +146,15 @@ export class StoryOrchestrator {
     const { foundScene } = this.findScene(story.plot, sceneId);
     if (!foundScene) throw new Error(`Scene not found: ${sceneId}`);
 
-    const beats = await this.llm.generate('BEAT_PLANNER', {
+    const rawBeats = await this.llm.generate('BEAT_PLANNER', {
       scene: foundScene,
       concept: story.concept,
       bible: story.storyBible,
       state: story.storyState,
       canonFacts: story.canon.facts,
     });
+
+    const beats = validateAndNormalizeBeats(rawBeats, foundScene, story.storyBible);
 
     foundScene.beats = beats;
     story.activeBeatId = beats[0]?.id;
