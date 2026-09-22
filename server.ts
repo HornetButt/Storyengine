@@ -11,6 +11,13 @@ import { getKnowledgeGraph } from './src/server/graph';
 import { discussStoryPlan, generateAutoOutline } from './src/server/planner';
 import { breakdownSceneToBeats, generateBeatProse, continueBeatProse } from './src/server/beatsGenerator';
 import { testLLMConnection, fetchAvailableModels, DEFAULT_PROVIDER_CONFIGS } from './src/server/llm';
+import { orchestrator } from './src/pipeline/orchestrator';
+import { CanonManager } from './src/pipeline/canonManager';
+import { StateManager } from './src/pipeline/stateManager';
+import { CriticSystem } from './src/pipeline/criticSystem';
+import { createDefaultStory } from './src/domain/adapters';
+
+const criticSystem = new CriticSystem();
 
 async function startServer() {
   const app = express();
@@ -559,6 +566,332 @@ async function startServer() {
         },
       ],
     });
+  });
+
+  // =========================================================================
+  // --- STORY ENGINE v2: DOMAIN MODEL & ORCHESTRATOR API ---
+  // =========================================================================
+
+  // List all FullStories
+  api.get('/engine/stories', (req, res) => {
+    const universeId = req.query.universeId as string | undefined;
+    res.json(storage.getFullStories(universeId));
+  });
+
+  // Get single FullStory
+  api.get('/engine/stories/:id', (req, res) => {
+    const story = storage.getFullStory(req.params.id);
+    if (!story) return res.status(404).json({ error: 'История не найдена' });
+    res.json(story);
+  });
+
+  // Create new FullStory
+  api.post('/engine/stories', (req, res) => {
+    const { title, universeId, storyYear, idea } = req.body;
+    const uni = storage.getUniverse(universeId) || storage.getUniverses()[0];
+    if (!uni) return res.status(400).json({ error: 'Вселенная не найдена' });
+
+    const newStory = createDefaultStory(
+      title || 'Новый проект сценария',
+      uni,
+      storyYear ? Number(storyYear) : 2026,
+      idea || ''
+    );
+    storage.saveFullStory(newStory);
+    res.status(201).json(newStory);
+  });
+
+  // Update FullStory directly
+  api.put('/engine/stories/:id', (req, res) => {
+    const existing = storage.getFullStory(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'История не найдена' });
+
+    const updated = {
+      ...existing,
+      ...req.body,
+      id: req.params.id,
+      updatedAt: new Date().toISOString(),
+    };
+    storage.saveFullStory(updated);
+    res.json(updated);
+  });
+
+  // Delete FullStory
+  api.delete('/engine/stories/:id', (req, res) => {
+    const success = storage.deleteFullStory(req.params.id);
+    res.json({ success });
+  });
+
+  // Pipeline Step 1: Generate or refine Concept
+  api.post('/engine/stories/:id/concept', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updated = await orchestrator.generateConcept(story, req.body.idea);
+      storage.saveFullStory(updated);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка генерации концепта' });
+    }
+  });
+
+  // Pipeline Step 2: Generate or refine Story Bible
+  api.post('/engine/stories/:id/bible', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updated = await orchestrator.generateBible(story);
+      storage.saveFullStory(updated);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка формирования Story Bible' });
+    }
+  });
+
+  // Pipeline Step 3: Generate or refine Plot (Acts -> Sequences -> Scenes)
+  api.post('/engine/stories/:id/plot', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updated = await orchestrator.generatePlot(story);
+      storage.saveFullStory(updated);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка генерации сюжета' });
+    }
+  });
+
+  // Pipeline Step 4: Plan or re-plan a single Scene
+  api.post('/engine/stories/:id/scenes/:sceneId/plan', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const result = await orchestrator.planScene(story, req.params.sceneId);
+      storage.saveFullStory(result.story);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка планирования сцены' });
+    }
+  });
+
+  // Pipeline Step 5: Decompose Scene into dramatic Beats
+  api.post('/engine/stories/:id/scenes/:sceneId/beats', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const result = await orchestrator.planBeats(story, req.params.sceneId);
+      storage.saveFullStory(result.story);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка разбивки сцены на биты' });
+    }
+  });
+
+  // Pipeline Step 6: Write prose for a specific Beat
+  api.post('/engine/stories/:id/scenes/:sceneId/beats/:beatId/write', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const result = await orchestrator.writeBeat(
+        story,
+        req.params.sceneId,
+        req.params.beatId,
+        req.body.styleDirectives
+      );
+      storage.saveFullStory(result.story);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка написания бита' });
+    }
+  });
+
+  // Pipeline Step 7: Write all beats for a Scene
+  api.post('/engine/stories/:id/scenes/:sceneId/write-all', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updated = await orchestrator.writeSceneAllBeats(story, req.params.sceneId);
+      storage.saveFullStory(updated);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка написания сцены' });
+    }
+  });
+
+  // Pipeline Step 8: Critic review of a Scene draft
+  api.post('/engine/stories/:id/scenes/:sceneId/review', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const { foundScene } = orchestrator.findScene(story.plot, req.params.sceneId);
+      if (!foundScene) return res.status(404).json({ error: 'Сцена не найдена' });
+
+      const text = req.body.draftText || foundScene.draft;
+      const report = await criticSystem.evaluateScene(story, foundScene, text);
+      foundScene.criticReport = report;
+      storage.saveFullStory(story);
+
+      res.json({ story, report });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка рецензирования сцены' });
+    }
+  });
+
+  // Pipeline Step 9: Extract Canon proposals from Scene draft
+  api.post('/engine/stories/:id/scenes/:sceneId/extract-canon', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const result = await orchestrator.extractCanonProposals(story, req.params.sceneId);
+      storage.saveFullStory(result.story);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка извлечения канона' });
+    }
+  });
+
+  // Pipeline Step 10: Revise Scene draft (creates a new version in `scene.drafts`)
+  api.post('/engine/stories/:id/scenes/:sceneId/revise', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const result = await orchestrator.reviseScene(
+        story,
+        req.params.sceneId,
+        req.body.userInstructions
+      );
+      storage.saveFullStory(result.story);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка ревизии черновика' });
+    }
+  });
+
+  // Pipeline Step 11: Commit scene and update StoryState
+  api.post('/engine/stories/:id/scenes/:sceneId/commit-state', async (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updated = await orchestrator.updateStoryState(story, req.params.sceneId);
+      storage.saveFullStory(updated);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Ошибка обновления состояния истории' });
+    }
+  });
+
+  // Canon: Accept proposal
+  api.post('/engine/stories/:id/canon/proposals/:propId/accept', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const result = CanonManager.acceptProposal(story, req.params.propId, req.body.editedProposal);
+      storage.saveFullStory(result.story);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Canon: Reject proposal
+  api.post('/engine/stories/:id/canon/proposals/:propId/reject', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updated = CanonManager.rejectProposal(story, req.params.propId);
+      storage.saveFullStory(updated);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Canon: Edit proposal
+  api.post('/engine/stories/:id/canon/proposals/:propId/edit', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updatedProp = CanonManager.editProposal(story, req.params.propId, req.body);
+      storage.saveFullStory(story);
+      res.json(updatedProp);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Canon: Add direct fact
+  api.post('/engine/stories/:id/canon/facts', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const fact = CanonManager.addDirectFact(story, req.body);
+      storage.saveFullStory(story);
+      res.status(201).json(fact);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Canon: Retcon fact
+  api.post('/engine/stories/:id/canon/facts/:factId/retcon', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const updated = CanonManager.retconFact(story, req.params.factId);
+      storage.saveFullStory(updated);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // State: Update character state manually
+  api.post('/engine/stories/:id/state/character', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const { name, location, emotion, newKnowledge } = req.body;
+      if (location) StateManager.updateCharacterLocation(story, name, location);
+      if (emotion) StateManager.updateCharacterEmotion(story, name, emotion);
+      if (newKnowledge) StateManager.addCharacterKnowledge(story, name, newKnowledge);
+
+      storage.saveFullStory(story);
+      res.json(story.storyState);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // State: Set event flag
+  api.post('/engine/stories/:id/state/flag', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+
+      const { flag, value } = req.body;
+      StateManager.setEventFlag(story, flag, value !== false);
+      storage.saveFullStory(story);
+      res.json(story.storyState);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   // Mount API router

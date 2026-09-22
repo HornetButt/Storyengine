@@ -17,6 +17,7 @@ import { EntitiesPage } from './pages/EntitiesPage';
 import { UniversesPage } from './pages/UniversesPage';
 import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ScriptEngineHub } from './pages/ScriptEngineHub';
 import { api } from './services/api';
 import {
   Universe,
@@ -29,7 +30,7 @@ import {
 } from './types';
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<NavItem>('dashboard');
+  const [currentTab, setCurrentTab] = useState<NavItem>('engine_story');
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
   const [canvasStoryId, setCanvasStoryId] = useState<string | null>(null);
   const [teleprompterStoryId, setTeleprompterStoryId] = useState<string | null>(null);
@@ -189,6 +190,20 @@ export default function App() {
                 setCurrentTab('beats');
               }}
               onStoryUpdated={loadAllData}
+            />
+          ) : currentTab.startsWith('engine_') ? (
+            <ScriptEngineHub
+              initialTab={
+                currentTab === 'engine_world'
+                  ? 'world'
+                  : currentTab === 'engine_plot'
+                  ? 'plot'
+                  : currentTab === 'engine_writer'
+                  ? 'writer'
+                  : currentTab === 'engine_review'
+                  ? 'review'
+                  : 'story'
+              }
             />
           ) : currentTab === 'beats' ? (
             <StoryBeatsStudio

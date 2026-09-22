@@ -9,6 +9,8 @@ import {
   ProposedKnowledgeChange,
   LLMConfig,
 } from '../types';
+import { FullStory } from '../domain/storyModel';
+import { legacyStoryToFullStory, fullStoryToLegacyStory, createDefaultStory } from '../domain/adapters';
 
 export interface StorageData {
   universes: Universe[];
@@ -923,6 +925,76 @@ class MemoryStorage {
       ...updates,
     };
     return this.data.llmConfig;
+  }
+
+  // --- Story Engine v2 Domain Model Support (FullStory) ---
+  private fullStories: Map<string, FullStory> = new Map();
+
+  getFullStory(id: string): FullStory | undefined {
+    if (this.fullStories.has(id)) {
+      return this.fullStories.get(id);
+    }
+
+    // Convert from legacy story on demand
+    const legacy = this.getStory(id);
+    if (!legacy) return undefined;
+
+    const universe = this.getUniverse(legacy.universeId) || this.data.universes[0];
+    const full = legacyStoryToFullStory(
+      legacy,
+      universe,
+      this.getCharacters(legacy.universeId),
+      this.getLocations(legacy.universeId)
+    );
+    this.fullStories.set(id, full);
+    return full;
+  }
+
+  getFullStories(universeId?: string): FullStory[] {
+    // Ensure all legacy stories exist in fullStories cache
+    for (const legacy of this.data.stories) {
+      if (!this.fullStories.has(legacy.id)) {
+        const universe = this.getUniverse(legacy.universeId) || this.data.universes[0];
+        const full = legacyStoryToFullStory(
+          legacy,
+          universe,
+          this.getCharacters(legacy.universeId),
+          this.getLocations(legacy.universeId)
+        );
+        this.fullStories.set(legacy.id, full);
+      }
+    }
+
+    const all = Array.from(this.fullStories.values());
+    if (universeId) {
+      return all.filter((s) => s.universeId === universeId);
+    }
+    return all;
+  }
+
+  saveFullStory(full: FullStory): FullStory {
+    full.updatedAt = new Date().toISOString();
+    this.fullStories.set(full.id, full);
+
+    // Sync back to legacy stories collection
+    const legacy = fullStoryToLegacyStory(full);
+    const existingIndex = this.data.stories.findIndex((s) => s.id === full.id);
+    if (existingIndex >= 0) {
+      this.data.stories[existingIndex] = {
+        ...this.data.stories[existingIndex],
+        ...legacy,
+        updatedAt: full.updatedAt,
+      };
+    } else {
+      this.data.stories.unshift(legacy);
+    }
+
+    return full;
+  }
+
+  deleteFullStory(id: string): boolean {
+    this.fullStories.delete(id);
+    return this.deleteStory(id);
   }
 }
 

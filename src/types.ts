@@ -345,3 +345,52 @@ export interface LLMTestResult {
   replySnippet?: string;
 }
 
+export type LorebookCategory =
+  | 'character'
+  | 'location'
+  | 'object'
+  | 'concept'
+  | 'magic_tech'
+  | 'faction'
+  | 'event'
+  | 'rule';
+
+export interface LorebookEntry {
+  id: string;
+  universeId: string;
+  title: string;
+  category: LorebookCategory;
+  keys: string[]; // Primary trigger keywords/phrases
+  secondaryKeys?: string[]; // Optional secondary keys for selective AND matching
+  regex?: string; // Optional custom regex trigger
+  content: string; // The injected lore snippet
+  priority: number; // Higher number = higher precedence (1..100)
+  constant: boolean; // Always inject regardless of keywords
+  selective?: boolean; // If true, requires at least 1 primary key AND 1 secondary key
+  enabled: boolean;
+  maxChars?: number;
+  entityType?: EntityType;
+  entityId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LorebookMatch {
+  entryId: string;
+  title: string;
+  category: LorebookCategory;
+  matchedKeys: string[];
+  matchedByRegex: boolean;
+  isConstant: boolean;
+  priority: number;
+  snippet: string;
+}
+
+export interface LorebookScanResult {
+  matches: LorebookMatch[];
+  activeEntries: LorebookEntry[];
+  prunedEntriesCount: number;
+  loreContextBlock: string;
+  totalCharsUsed: number;
+}
+
