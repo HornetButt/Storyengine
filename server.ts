@@ -71,6 +71,33 @@ async function startServer() {
     res.json({ success });
   });
 
+  // Export universe
+  api.get('/universes/:id/export', (req, res) => {
+    try {
+      const archive = storage.exportUniverse(req.params.id);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="universe-${req.params.id}.json"`
+      );
+      res.json(archive);
+    } catch (e: any) {
+      res.status(404).json({ error: e.message || 'Ошибка экспорта вселенной' });
+    }
+  });
+
+  // Import universe
+  api.post('/universes/import', (req, res) => {
+    try {
+      const archive = req.body.archive || req.body;
+      const strategy = (req.query.strategy as any) || req.body.strategy || 'copy';
+      const result = storage.importUniverse(archive, { strategy });
+      res.status(200).json(result);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || 'Ошибка импорта вселенной' });
+    }
+  });
+
   // Characters
   api.get('/characters', (req, res) => {
     const universeId = req.query.universeId as string | undefined;
@@ -171,6 +198,46 @@ async function startServer() {
   api.delete('/stories/:id', (req, res) => {
     const success = storage.deleteStory(req.params.id);
     res.json({ success });
+  });
+
+  // Story Versions & Checkpoints
+  api.get('/stories/:id/versions', (req, res) => {
+    try {
+      const versions = storage.getStoryVersions(req.params.id);
+      res.json(versions);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.get('/stories/:id/versions/:verId', (req, res) => {
+    try {
+      const version = storage.getStoryVersion(req.params.id, req.params.verId);
+      if (!version) return res.status(404).json({ error: 'Версия не найдена' });
+      res.json(version);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.post('/stories/:id/versions', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+      const record = storage.createStoryVersion(req.params.id, story, req.body.reason);
+      res.status(201).json(record);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.post('/stories/:id/versions/:verId/restore', (req, res) => {
+    try {
+      const restored = storage.restoreStoryVersion(req.params.id, req.params.verId);
+      res.json(restored);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   // Import story file
@@ -601,25 +668,77 @@ async function startServer() {
     res.status(201).json(newStory);
   });
 
-  // Update FullStory directly
+  // Update FullStory directly with optimistic concurrency support
   api.put('/engine/stories/:id', (req, res) => {
     const existing = storage.getFullStory(req.params.id);
     if (!existing) return res.status(404).json({ error: 'История не найдена' });
 
-    const updated = {
-      ...existing,
-      ...req.body,
-      id: req.params.id,
-      updatedAt: new Date().toISOString(),
-    };
-    storage.saveFullStory(updated);
-    res.json(updated);
+    try {
+      const { expectedRevision, createVersion, versionReason, ...storyData } = req.body;
+      const updated = {
+        ...existing,
+        ...storyData,
+        id: req.params.id,
+        updatedAt: new Date().toISOString(),
+      };
+      storage.saveFullStory(updated, {
+        expectedRevision: expectedRevision !== undefined ? Number(expectedRevision) : undefined,
+        createVersion: !!createVersion,
+        versionReason,
+      });
+      res.json(updated);
+    } catch (e: any) {
+      if (e.name === 'RevisionConflictError' || e.code === 'REVISION_CONFLICT') {
+        return res.status(409).json({ error: e.message });
+      }
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Delete FullStory
   api.delete('/engine/stories/:id', (req, res) => {
     const success = storage.deleteFullStory(req.params.id);
     res.json({ success });
+  });
+
+  // Engine Story Versions
+  api.get('/engine/stories/:id/versions', (req, res) => {
+    try {
+      const versions = storage.getStoryVersions(req.params.id);
+      res.json(versions);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.get('/engine/stories/:id/versions/:verId', (req, res) => {
+    try {
+      const version = storage.getStoryVersion(req.params.id, req.params.verId);
+      if (!version) return res.status(404).json({ error: 'Версия не найдена' });
+      res.json(version);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.post('/engine/stories/:id/versions', (req, res) => {
+    try {
+      const story = storage.getFullStory(req.params.id);
+      if (!story) return res.status(404).json({ error: 'История не найдена' });
+      const record = storage.createStoryVersion(req.params.id, story, req.body.reason);
+      res.status(201).json(record);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.post('/engine/stories/:id/versions/:verId/restore', (req, res) => {
+    try {
+      const restored = storage.restoreStoryVersion(req.params.id, req.params.verId);
+      res.json(restored);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   // Pipeline Step 1: Generate or refine Concept
@@ -924,9 +1043,25 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Story Engine Server running at http://0.0.0.0:${PORT}`);
   });
+
+  const cleanup = () => {
+    console.log('[Server] Graceful shutdown initiated. Closing database connection...');
+    try {
+      storage.shutdown();
+    } catch (err) {
+      console.error('[Server] Error during storage shutdown:', err);
+    }
+    server.close(() => {
+      console.log('[Server] HTTP server closed.');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
 }
 
 startServer();
